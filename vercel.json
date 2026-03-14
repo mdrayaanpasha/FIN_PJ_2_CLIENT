@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/hackathon", "destination": "/" },
+   
+
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}
