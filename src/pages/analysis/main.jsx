@@ -1,14 +1,13 @@
 /**
- * Quantiva Dashboard v3
- * Light mode · DM Mono + DM Sans · Swiss editorial × Bloomberg
+ * Quantiva Dashboard v3.1
+ * Light/Dark mode · DM Mono + DM Sans · Swiss editorial × Bloomberg
+ * Cold-start UX for Render free tier
  *
- * Add to index.html / global CSS:
  * <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
 export const TICKERS = [
   "AAPL","MSFT","GOOGL","AMZN","NVDA","META","TSLA","BRK-B","JPM","V",
   "UNH","XOM","JNJ","WMT","MA","PG","LLY","CVX","HD","MRK",
@@ -25,8 +24,8 @@ export const TICKERS = [
 const API = "https://fin-pip-server-4.onrender.com/data/";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const fmt     = (n, d = 2) => n == null ? "—" : parseFloat(n).toFixed(d);
-const fmtVol  = (n) => {
+const fmt    = (n, d = 2) => n == null ? "—" : parseFloat(n).toFixed(d);
+const fmtVol = (n) => {
   if (n == null) return "—";
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -41,35 +40,180 @@ const fmtDate = (iso) => {
   });
 };
 
-// ─── Tokens ───────────────────────────────────────────────────────────────────
-// accent: deep ink-blue
-// up: forest green  down: crimson
-const T = {
-  accent:    "#1a3a6b",
-  accentBg:  "#f0f4fa",
-  up:        "#1a7a45",
-  upBg:      "#f0faf4",
-  upBorder:  "#b6dfc9",
-  down:      "#b91c1c",
-  downBg:    "#fef2f2",
-  downBorder:"#fccaca",
-  border:    "#e5e7eb",
-  borderMid: "#d1d5db",
-  surface:   "#f9fafb",
-  muted:     "#9ca3af",
-  label:     "#6b7280",
-  body:      "#111827",
-  mono:      "'DM Mono', monospace",
-  sans:      "'DM Sans', sans-serif",
-};
+// ─── Theme tokens ─────────────────────────────────────────────────────────────
+const makeTheme = (dark) => ({
+  accent:     dark ? "#5b8dee"  : "#1a3a6b",
+  accentBg:   dark ? "#1a2540"  : "#f0f4fa",
+  up:         dark ? "#34d27a"  : "#1a7a45",
+  upBg:       dark ? "#0d2318"  : "#f0faf4",
+  upBorder:   dark ? "#1e5c37"  : "#b6dfc9",
+  down:       dark ? "#f87171"  : "#b91c1c",
+  downBg:     dark ? "#2a1212"  : "#fef2f2",
+  downBorder: dark ? "#6b2020"  : "#fccaca",
+  border:     dark ? "#2a2d35"  : "#e5e7eb",
+  borderMid:  dark ? "#3a3d48"  : "#d1d5db",
+  surface:    dark ? "#111318"  : "#f9fafb",
+  muted:      dark ? "#5a6175"  : "#9ca3af",
+  label:      dark ? "#7a8499"  : "#6b7280",
+  body:       dark ? "#e8eaf0"  : "#111827",
+  cardBg:     dark ? "#16191f"  : "#ffffff",
+  headerBg:   dark ? "#0e1015"  : "#ffffff",
+  mono:       "'DM Mono', monospace",
+  sans:       "'DM Sans', sans-serif",
+  dark,
+});
+
+// ─── Cold Start Overlay ───────────────────────────────────────────────────────
+const COLD_START_STEPS = [
+  { at: 0,  msg: "Sending wake-up signal to server…",       icon: "📡" },
+  { at: 5,  msg: "Server is spinning up from sleep…",       icon: "⚙️" },
+  { at: 15, msg: "Initialising pipeline services…",         icon: "🔧" },
+  { at: 28, msg: "Connecting to Kafka & Redis…",            icon: "🔗" },
+  { at: 42, msg: "Fetching market data streams…",           icon: "📊" },
+  { at: 55, msg: "Running anomaly detection…",              icon: "🔍" },
+  { at: 68, msg: "Computing technical indicators…",         icon: "📈" },
+  { at: 80, msg: "Almost there — finalising response…",     icon: "⏳" },
+];
+
+function ColdStartOverlay({ T, elapsed, ticker }) {
+  const step = [...COLD_START_STEPS].reverse().find(s => elapsed >= s.at) || COLD_START_STEPS[0];
+  const pct  = Math.min((elapsed / 90) * 100, 98);
+  const isSlow = elapsed > 30;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200,
+      background: T.dark ? "rgba(10,11,15,0.97)" : "rgba(249,250,251,0.97)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: T.mono,
+    }}>
+      <div style={{ width: 420, display: "flex", flexDirection: "column", gap: 28 }}>
+
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="22" height="22" viewBox="0 0 28 28">
+            <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill={T.accent} />
+          </svg>
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.2em", color: T.accent }}>Arbit</span>
+        </div>
+
+        {/* Main message */}
+        <div>
+          <div style={{ fontSize: 9, letterSpacing: "0.14em", color: T.muted, marginBottom: 10 }}>
+            WAKING SERVER · {ticker}
+          </div>
+          <div style={{ fontSize: 13, color: T.body, lineHeight: 1.7, marginBottom: 6 }}>
+            <span style={{ marginRight: 8 }}>{step.icon}</span>
+            {step.msg}
+          </div>
+          <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.08em" }}>
+            {elapsed}s elapsed
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ height: 2, background: T.border, position: "relative", overflow: "hidden" }}>
+            <div style={{
+              position: "absolute", left: 0, top: 0, bottom: 0,
+              width: `${pct}%`,
+              background: T.accent,
+              transition: "width 1s linear",
+            }} />
+            {/* shimmer */}
+            <div style={{
+              position: "absolute", top: 0, bottom: 0, width: 60,
+              background: `linear-gradient(90deg, transparent, ${T.dark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.6)"}, transparent)`,
+              animation: "shimmer 1.8s ease-in-out infinite",
+              left: `${Math.max(pct - 10, 0)}%`,
+            }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.muted }}>
+            <span>0s</span>
+            <span style={{ color: isSlow ? "#d97706" : T.muted }}>
+              {isSlow ? "⚠ Free tier cold start — thanks for your patience" : "Estimated: ~60s"}
+            </span>
+            <span>90s</span>
+          </div>
+        </div>
+
+        {/* Step pills */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {COLD_START_STEPS.map((s, i) => {
+            const done    = elapsed >= s.at;
+            const current = step === s;
+            return (
+              <div key={i} style={{
+                fontSize: 9, letterSpacing: "0.1em", padding: "4px 10px",
+                border: `1px solid ${done ? T.accent : T.border}`,
+                background: current ? T.accentBg : "transparent",
+                color: done ? T.accent : T.muted,
+                transition: "all 0.4s ease",
+              }}>
+                {done ? "✓ " : ""}{s.icon} {["WAKE","SPIN","INIT","KAFKA","DATA","DETECT","INDICATORS","FINALIZE"][i]}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Info box */}
+        <div style={{
+          padding: "12px 14px",
+          border: `1px solid ${T.border}`,
+          background: T.accentBg,
+          fontSize: 10, color: T.label, lineHeight: 1.8, letterSpacing: "0.04em",
+        }}>
+          <span style={{ color: T.accent, letterSpacing: "0.1em" }}>WHY THE WAIT?</span>
+          <br />
+          Arbit's backend runs on Render's free tier, which sleeps after 15 min of inactivity.
+          First request wakes the full pipeline — Kafka, Redis, PostgreSQL, and 4 microservices.
+          Subsequent requests are instant.
+        </div>
+
+      </div>
+
+      <style>{`
+        @keyframes shimmer {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(400%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Theme Toggle ─────────────────────────────────────────────────────────────
+function ThemeToggle({ dark, onToggle, T }) {
+  return (
+    <button
+      onClick={onToggle}
+      title={dark ? "Switch to light mode" : "Switch to dark mode"}
+      style={{
+        width: 36, height: 20, borderRadius: 10, border: `1px solid ${T.borderMid}`,
+        background: dark ? T.accent : T.surface,
+        cursor: "pointer", position: "relative", transition: "background 0.25s",
+        flexShrink: 0,
+      }}
+    >
+      <div style={{
+        position: "absolute", top: 2, left: dark ? 17 : 2,
+        width: 14, height: 14, borderRadius: "50%",
+        background: dark ? "#fff" : T.borderMid,
+        transition: "left 0.25s, background 0.25s",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 8,
+      }}>
+        {dark ? "🌙" : "☀"}
+      </div>
+    </button>
+  );
+}
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
-function Sparkline({ ohlcv }) {
+function Sparkline({ ohlcv, T }) {
   if (!ohlcv?.open) return (
     <div className="flex items-center justify-center h-full">
-      <span style={{ fontFamily: T.mono, fontSize: 11, color: T.muted, letterSpacing: "0.1em" }}>
-        NO DATA
-      </span>
+      <span style={{ fontFamily: T.mono, fontSize: 11, color: T.muted, letterSpacing: "0.1em" }}>NO DATA</span>
     </div>
   );
 
@@ -93,38 +237,34 @@ function Sparkline({ ohlcv }) {
   });
   const fill = [`${P},${H}`, ...pts, `${W - P},${H}`].join(" ");
   const lc = isUp ? T.up : T.down;
-  const fc = isUp ? "rgba(26,122,69,0.07)" : "rgba(185,28,28,0.06)";
+  const fc = isUp ? (T.dark ? "rgba(52,210,122,0.08)" : "rgba(26,122,69,0.07)") : (T.dark ? "rgba(248,113,113,0.08)" : "rgba(185,28,28,0.06)");
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
       <polygon points={fill} fill={fc} />
       <polyline points={pts.join(" ")} fill="none" stroke={lc} strokeWidth="1.5"
         strokeLinejoin="round" strokeLinecap="round" />
-      <text x="12" y="13" style={{ fontFamily: T.mono, fontSize: "9px", fill: T.muted, letterSpacing: "0.06em" }}>
-        H {fmt(h)}
-      </text>
-      <text x="12" y={H - 5} style={{ fontFamily: T.mono, fontSize: "9px", fill: T.muted, letterSpacing: "0.06em" }}>
-        L {fmt(l)}
-      </text>
+      <text x="12" y="13" style={{ fontFamily: T.mono, fontSize: "9px", fill: T.muted, letterSpacing: "0.06em" }}>H {fmt(h)}</text>
+      <text x="12" y={H - 5} style={{ fontFamily: T.mono, fontSize: "9px", fill: T.muted, letterSpacing: "0.06em" }}>L {fmt(l)}</text>
     </svg>
   );
 }
 
 // ─── RSI Gauge ────────────────────────────────────────────────────────────────
-function RSIGauge({ value }) {
+function RSIGauge({ value, T }) {
   const v = Math.min(Math.max(+value || 0, 0), 100);
-  const zone = v >= 70 ? { label: "OVERBOUGHT", color: T.down } :
-               v <= 30 ? { label: "OVERSOLD",   color: T.up   } :
-                         { label: "NEUTRAL",    color: T.accent };
+  const zone = v >= 70 ? { label: "OVERBOUGHT", color: T.down }
+             : v <= 30 ? { label: "OVERSOLD",   color: T.up }
+             :           { label: "NEUTRAL",    color: T.accent };
   return (
     <div>
-      <div className="flex justify-between items-baseline mb-1.5">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
         <span style={{ fontFamily: T.mono, fontSize: 22, fontWeight: 400, color: T.body }}>{fmt(v)}</span>
         <span style={{ fontFamily: T.mono, fontSize: 9, letterSpacing: "0.12em", color: zone.color }}>{zone.label}</span>
       </div>
       <div style={{ background: T.border, height: 3, position: "relative" }}>
-        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "30%", background: "rgba(26,122,69,0.15)" }} />
-        <div style={{ position: "absolute", left: "70%", right: 0, top: 0, bottom: 0, background: "rgba(185,28,28,0.15)" }} />
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "30%", background: T.dark ? "rgba(52,210,122,0.12)" : "rgba(26,122,69,0.15)" }} />
+        <div style={{ position: "absolute", left: "70%", right: 0, top: 0, bottom: 0, background: T.dark ? "rgba(248,113,113,0.12)" : "rgba(185,28,28,0.15)" }} />
         <div style={{ height: "100%", width: `${v}%`, background: zone.color, transition: "width 0.8s ease" }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
@@ -137,11 +277,11 @@ function RSIGauge({ value }) {
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
-function Search({ onSelect }) {
-  const [q, setQ]         = useState("");
-  const [open, setOpen]   = useState(false);
-  const [cur, setCur]     = useState(0);
-  const wrapRef           = useRef(null);
+function Search({ onSelect, T }) {
+  const [q, setQ]       = useState("");
+  const [open, setOpen] = useState(false);
+  const [cur, setCur]   = useState(0);
+  const wrapRef         = useRef(null);
 
   const matches = q.length > 0 ? TICKERS.filter(t => t.startsWith(q.toUpperCase())).slice(0, 9) : [];
 
@@ -162,7 +302,7 @@ function Search({ onSelect }) {
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
-      <div style={{ display: "flex", border: `1px solid ${T.borderMid}`, background: "#fff" }}>
+      <div style={{ display: "flex", border: `1px solid ${T.borderMid}`, background: T.cardBg }}>
         <input
           value={q}
           onChange={e => { setQ(e.target.value.toUpperCase()); setOpen(true); setCur(0); }}
@@ -185,7 +325,7 @@ function Search({ onSelect }) {
             background: T.accent, color: "#fff", border: "none",
             cursor: "pointer", transition: "opacity .15s",
           }}
-          onMouseEnter={e => e.target.style.opacity = ".85"}
+          onMouseEnter={e => e.target.style.opacity = ".75"}
           onMouseLeave={e => e.target.style.opacity = "1"}
         >
           GO
@@ -195,8 +335,8 @@ function Search({ onSelect }) {
       {open && matches.length > 0 && (
         <div style={{
           position: "absolute", top: "100%", left: 0, zIndex: 100,
-          width: "100%", background: "#fff", border: `1px solid ${T.borderMid}`,
-          borderTop: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+          width: "100%", background: T.cardBg, border: `1px solid ${T.borderMid}`,
+          borderTop: "none", boxShadow: T.dark ? "0 8px 24px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.08)",
         }}>
           {matches.map((t, i) => (
             <button
@@ -207,7 +347,7 @@ function Search({ onSelect }) {
                 fontFamily: T.mono, fontSize: 12, letterSpacing: "0.08em",
                 padding: "8px 14px", border: "none", cursor: "pointer",
                 transition: "background .1s",
-                background: i === cur ? T.accentBg : "#fff",
+                background: i === cur ? T.accentBg : T.cardBg,
                 color: i === cur ? T.accent : T.body,
               }}
             >
@@ -221,8 +361,8 @@ function Search({ onSelect }) {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ active, onSelect, watchlist, onRemove }) {
-  const [tab, setTab]     = useState("watch");
+function Sidebar({ active, onSelect, watchlist, onRemove, T }) {
+  const [tab, setTab]       = useState("watch");
   const [filter, setFilter] = useState("");
 
   const allFiltered = TICKERS.filter(t => !filter || t.includes(filter.toUpperCase()));
@@ -241,9 +381,8 @@ function Sidebar({ active, onSelect, watchlist, onRemove }) {
       width: 168, flexShrink: 0,
       borderRight: `1px solid ${T.border}`,
       display: "flex", flexDirection: "column",
-      background: "#fff", overflow: "hidden",
+      background: T.cardBg, overflow: "hidden",
     }}>
-      {/* tabs */}
       <div style={{ display: "flex", borderBottom: `1px solid ${T.border}` }}>
         <button style={tabStyle("watch")} onClick={() => setTab("watch")}>WATCH</button>
         <button style={tabStyle("all")}   onClick={() => setTab("all")}>ALL 100</button>
@@ -256,7 +395,7 @@ function Sidebar({ active, onSelect, watchlist, onRemove }) {
               SEARCH &amp; ADD<br />TICKERS TO<br />WATCHLIST
             </div>
           ) : watchlist.map(t => (
-            <WatchItem key={t} ticker={t} active={t === active} onSelect={onSelect} onRemove={onRemove} />
+            <WatchItem key={t} ticker={t} active={t === active} onSelect={onSelect} onRemove={onRemove} T={T} />
           ))}
         </div>
       ) : (
@@ -300,7 +439,7 @@ function Sidebar({ active, onSelect, watchlist, onRemove }) {
   );
 }
 
-function WatchItem({ ticker, active, onSelect, onRemove }) {
+function WatchItem({ ticker, active, onSelect, onRemove, T }) {
   const [hov, setHov] = useState(false);
   return (
     <div
@@ -311,7 +450,7 @@ function WatchItem({ ticker, active, onSelect, onRemove }) {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 14px", cursor: "pointer", transition: "background .1s",
         borderLeft: active ? `2px solid ${T.accent}` : "2px solid transparent",
-        background: active ? T.accentBg : hov ? T.surface : "#fff",
+        background: active ? T.accentBg : hov ? T.surface : T.cardBg,
       }}
     >
       <span style={{
@@ -326,7 +465,6 @@ function WatchItem({ ticker, active, onSelect, onRemove }) {
           style={{
             fontFamily: T.mono, fontSize: 9, color: T.muted,
             border: "none", background: "none", cursor: "pointer", padding: "0 2px",
-            transition: "color .1s",
           }}
           onMouseEnter={e => e.target.style.color = T.down}
           onMouseLeave={e => e.target.style.color = T.muted}
@@ -338,27 +476,10 @@ function WatchItem({ ticker, active, onSelect, onRemove }) {
   );
 }
 
-// ─── Data Row ─────────────────────────────────────────────────────────────────
-function DataRow({ label, value, valueColor, right = true }) {
-  return (
-    <div style={{
-      display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "9px 0", borderBottom: `1px solid ${T.border}`,
-    }}>
-      <span style={{ fontFamily: T.mono, fontSize: 10, letterSpacing: "0.1em", color: T.label, textTransform: "uppercase" }}>
-        {label}
-      </span>
-      <span style={{ fontFamily: T.mono, fontSize: 14, color: valueColor || T.body, fontWeight: 400 }}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
 // ─── Card ─────────────────────────────────────────────────────────────────────
-function Card({ label, children, right }) {
+function Card({ label, children, right, T }) {
   return (
-    <div style={{ border: `1px solid ${T.border}`, background: "#fff" }}>
+    <div style={{ border: `1px solid ${T.border}`, background: T.cardBg }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 16px", borderBottom: `1px solid ${T.border}`,
@@ -375,6 +496,9 @@ function Card({ label, children, right }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function QuantivaDashboard() {
+  const [dark,        setDark]        = useState(false);
+  const T = makeTheme(dark);
+
   const [active,      setActive]      = useState("HOOD");
   const [data,        setData]        = useState(null);
   const [status,      setStatus]      = useState("idle");
@@ -383,16 +507,50 @@ export default function QuantivaDashboard() {
   const [watchlist,   setWatchlist]   = useState(["HOOD","AAPL","NVDA","TSLA","MSFT"]);
   const [sidebar,     setSidebar]     = useState(true);
 
+  // Cold start UX state
+  const [coldStart,   setColdStart]   = useState(false);
+  const [elapsed,     setElapsed]     = useState(0);
+  const elapsedRef    = useRef(0);
+  const timerRef      = useRef(null);
+  const fetchStartRef = useRef(null);
+
+  const startColdStartTimer = () => {
+    elapsedRef.current = 0;
+    setElapsed(0);
+    setColdStart(true);
+    fetchStartRef.current = Date.now();
+    timerRef.current = setInterval(() => {
+      elapsedRef.current += 1;
+      setElapsed(elapsedRef.current);
+    }, 1000);
+  };
+
+  const stopColdStartTimer = () => {
+    clearInterval(timerRef.current);
+    setColdStart(false);
+    setElapsed(0);
+    elapsedRef.current = 0;
+  };
+
   const fetchData = useCallback(async (sym) => {
     if (!sym) return;
-    setStatus("loading"); setErrMsg("");
+    setStatus("loading"); setErrMsg(""); setData(null);
+
+    // Start cold-start UX immediately — if it resolves fast, we cancel it
+    const coldStartDelay = setTimeout(() => startColdStartTimer(), 2000);
+
     try {
       const res  = await fetch(API + sym);
+      clearTimeout(coldStartDelay);
+      stopColdStartTimer();
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json); setStatus("live");
       setUpdated(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }));
     } catch (e) {
+      clearTimeout(coldStartDelay);
+      stopColdStartTimer();
       setStatus("error"); setErrMsg(e.message); setData(null);
     }
   }, []);
@@ -400,22 +558,23 @@ export default function QuantivaDashboard() {
   const pick = useCallback((sym) => { setActive(sym); fetchData(sym); }, [fetchData]);
 
   useEffect(() => { fetchData("HOOD"); }, []);
+  useEffect(() => () => clearInterval(timerRef.current), []);
 
-  const addWatch    = t => { if (!watchlist.includes(t)) setWatchlist(p => [t, ...p]); };
-  const rmWatch     = t => setWatchlist(p => p.filter(x => x !== t));
-  const inWatch     = watchlist.includes(active);
+  const addWatch = t => { if (!watchlist.includes(t)) setWatchlist(p => [t, ...p]); };
+  const rmWatch  = t => setWatchlist(p => p.filter(x => x !== t));
+  const inWatch  = watchlist.includes(active);
 
   const ohlcv     = data?.ohlcv?.[0]                  || {};
   const ind       = data?.indicators?.historical?.[0] || {};
   const latest    = data?.indicators?.latest;
   const anomalies = data?.anomalies                    || [];
 
-  const close  = +ohlcv.close || 0;
-  const openP  = +ohlcv.open  || 0;
-  const chg    = close - openP;
-  const chgPct = openP ? (chg / openP) * 100 : 0;
-  const isUp   = chg >= 0;
-  const rsi    = +ind.rsi || 0;
+  const close   = +ohlcv.close || 0;
+  const openP   = +ohlcv.open  || 0;
+  const chg     = close - openP;
+  const chgPct  = openP ? (chg / openP) * 100 : 0;
+  const isUp    = chg >= 0;
+  const rsi     = +ind.rsi || 0;
 
   const statusMeta = {
     idle:    { color: T.muted,   dot: T.muted,    text: "IDLE"    },
@@ -425,39 +584,41 @@ export default function QuantivaDashboard() {
   }[status];
 
   return (
-    <div style={{ minHeight: "100vh", background: T.surface, fontFamily: T.sans, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: T.surface, fontFamily: T.sans, display: "flex", flexDirection: "column", transition: "background 0.3s, color 0.3s" }}>
 
-      {/* ── Header ───────────────────────────────────────────────────────── */}
+      {/* Cold start overlay */}
+      {coldStart && <ColdStartOverlay T={T} elapsed={elapsed} ticker={active} />}
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <header style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px", height: 52, borderBottom: `1px solid ${T.border}`,
-        background: "#fff", flexShrink: 0, gap: 16,
+        background: T.headerBg, flexShrink: 0, gap: 16,
+        transition: "background 0.3s",
       }}>
-        {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <button
             onClick={() => setSidebar(s => !s)}
-            style={{ fontFamily: T.mono, fontSize: 14, color: T.muted, border: "none", background: "none", cursor: "pointer", lineHeight: 1, padding: "0 4px", transition: "color .15s" }}
+            style={{ fontFamily: T.mono, fontSize: 14, color: T.muted, border: "none", background: "none", cursor: "pointer", lineHeight: 1, padding: "0 4px" }}
             onMouseEnter={e => e.target.style.color = T.body}
             onMouseLeave={e => e.target.style.color = T.muted}
           >
             ☰
           </button>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", cursor:"pointer", gap: 8 }} onClick={e=>window.location.href="/"}>
+          <div style={{ display: "flex", alignItems: "center", cursor: "pointer", gap: 8 }} onClick={() => window.location.href = "/"}>
             <svg width="20" height="20" viewBox="0 0 28 28">
               <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill={T.accent} />
             </svg>
             <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 500, letterSpacing: "0.18em", color: T.accent }}>
-              QUANTIVA
+              Arbit
             </span>
           </div>
         </div>
 
-        {/* Right */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <Search onSelect={pick} />
-          {/* Status pill */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Search onSelect={pick} T={T} />
+
+          {/* Status */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{
               width: 6, height: 6, borderRadius: "50%", background: statusMeta.dot,
@@ -468,32 +629,29 @@ export default function QuantivaDashboard() {
             </span>
             {updated && <span style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, marginLeft: 4 }}>{updated}</span>}
           </div>
+
+          {/* Theme toggle */}
+          <ThemeToggle dark={dark} onToggle={() => setDark(d => !d)} T={T} />
         </div>
       </header>
 
-      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      {/* ── Body ───────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        {/* Sidebar */}
-        {sidebar && (
-          <Sidebar active={active} onSelect={pick} watchlist={watchlist} onRemove={rmWatch} />
-        )}
+        {sidebar && <Sidebar active={active} onSelect={pick} watchlist={watchlist} onRemove={rmWatch} T={T} />}
 
-        {/* Main scroll area */}
         <main style={{ flex: 1, overflowY: "auto", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
 
-          {/* Error banner */}
           {status === "error" && (
             <div style={{
               display: "flex", gap: 12, alignItems: "center",
-              padding: "12px 16px", background: "#fef2f2", border: `1px solid ${T.downBorder}`,
+              padding: "12px 16px", background: T.downBg, border: `1px solid ${T.downBorder}`,
             }}>
               <span style={{ fontFamily: T.mono, fontSize: 10, letterSpacing: "0.1em", color: T.down }}>ERR</span>
               <span style={{ fontFamily: T.mono, fontSize: 11, color: T.body }}>{errMsg}</span>
             </div>
           )}
 
-          {/* Empty */}
           {!data && status === "idle" && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 12, paddingTop: 80 }}>
               <svg width="36" height="36" viewBox="0 0 28 28" style={{ opacity: .2 }}>
@@ -505,8 +663,8 @@ export default function QuantivaDashboard() {
             </div>
           )}
 
-          {/* Skeleton */}
-          {status === "loading" && !data && (
+          {/* Skeleton while loading (before cold-start kicks in) */}
+          {status === "loading" && !data && !coldStart && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {[72, 64, 140, 200].map((h, i) => (
                 <div key={i} style={{ height: h, background: T.border, animation: "pulse 1.4s ease-in-out infinite", animationDelay: `${i * .1}s` }} />
@@ -514,13 +672,11 @@ export default function QuantivaDashboard() {
             </div>
           )}
 
-          {/* Data */}
           {data && (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-              {/* ── Hero ── */}
+              {/* Hero */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
-                {/* Left */}
                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: T.mono, fontSize: 44, fontWeight: 300, letterSpacing: "-0.01em", color: T.body, lineHeight: 1 }}>
                     {data.ticker}
@@ -530,7 +686,7 @@ export default function QuantivaDashboard() {
                     style={{
                       fontFamily: T.mono, fontSize: 9, letterSpacing: "0.12em",
                       padding: "5px 12px", border: `1px solid ${inWatch ? T.accent : T.borderMid}`,
-                      background: inWatch ? T.accentBg : "#fff",
+                      background: inWatch ? T.accentBg : T.cardBg,
                       color: inWatch ? T.accent : T.label,
                       cursor: "pointer", transition: "all .15s",
                     }}
@@ -540,7 +696,6 @@ export default function QuantivaDashboard() {
                     {inWatch ? "★ WATCHING" : "☆ ADD TO WATCHLIST"}
                   </button>
                 </div>
-                {/* Right */}
                 <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: T.mono, fontSize: 38, fontWeight: 300, color: T.body, lineHeight: 1 }}>
                     ${fmt(close)}
@@ -557,53 +712,40 @@ export default function QuantivaDashboard() {
                 </div>
               </div>
 
-              {/* ── OHLCV stat strip ── */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: `1px solid ${T.border}`, background: "#fff" }}>
+              {/* OHLCV strip */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: `1px solid ${T.border}`, background: T.cardBg }}>
                 {[
-                  { label: "OPEN",   val: `${fmt(openP)}`,       color: T.body   },
-                  { label: "HIGH",   val: `${fmt(ohlcv.high)}`,  color: T.up     },
-                  { label: "LOW",    val: `${fmt(ohlcv.low)}`,   color: T.down   },
-                  { label: "VOLUME", val: fmtVol(ohlcv.volume),  color: T.body   },
+                  { label: "OPEN",   val: `${fmt(openP)}`,      color: T.body },
+                  { label: "HIGH",   val: `${fmt(ohlcv.high)}`, color: T.up   },
+                  { label: "LOW",    val: `${fmt(ohlcv.low)}`,  color: T.down },
+                  { label: "VOLUME", val: fmtVol(ohlcv.volume), color: T.body },
                 ].map((s, i) => (
-                  <div key={s.label} style={{
-                    padding: "12px 16px",
-                    borderRight: i < 3 ? `1px solid ${T.border}` : "none",
-                  }}>
-                    <div style={{ fontFamily: T.mono, fontSize: 9, letterSpacing: "0.12em", color: T.muted, marginBottom: 4 }}>
-                      {s.label}
-                    </div>
-                    <div style={{ fontFamily: T.mono, fontSize: 18, color: s.color, fontWeight: 400 }}>
-                      {s.val}
-                    </div>
+                  <div key={s.label} style={{ padding: "12px 16px", borderRight: i < 3 ? `1px solid ${T.border}` : "none" }}>
+                    <div style={{ fontFamily: T.mono, fontSize: 9, letterSpacing: "0.12em", color: T.muted, marginBottom: 4 }}>{s.label}</div>
+                    <div style={{ fontFamily: T.mono, fontSize: 18, color: s.color, fontWeight: 400 }}>{s.val}</div>
                   </div>
                 ))}
               </div>
 
-              {/* ── Sparkline ── */}
-              <div style={{ height: 130, border: `1px solid ${T.border}`, background: "#fff", overflow: "hidden" }}>
-                <Sparkline ohlcv={ohlcv} />
+              {/* Sparkline */}
+              <div style={{ height: 130, border: `1px solid ${T.border}`, background: T.cardBg, overflow: "hidden" }}>
+                <Sparkline ohlcv={ohlcv} T={T} />
               </div>
 
-              {/* ── Two-col ── */}
+              {/* Two-col */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-                {/* Indicators */}
-                <Card label="Technical Indicators" right={fmtDate(ind.timestamp)}>
+                <Card label="Technical Indicators" right={fmtDate(ind.timestamp)} T={T}>
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontFamily: T.mono, fontSize: 9, letterSpacing: "0.1em", color: T.muted, marginBottom: 8, textTransform: "uppercase" }}>
-                      RSI
-                    </div>
-                    <RSIGauge value={rsi} />
+                    <div style={{ fontFamily: T.mono, fontSize: 9, letterSpacing: "0.1em", color: T.muted, marginBottom: 8, textTransform: "uppercase" }}>RSI</div>
+                    <RSIGauge value={rsi} T={T} />
                   </div>
                   <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12 }}>
                     {[
                       { label: "EMA", val: `$${fmt(ind.ema)}` },
                       { label: "SMA", val: `$${fmt(ind.sma)}` },
                     ].map(r => (
-                      <div key={r.label} style={{
-                        display: "flex", justifyContent: "space-between", padding: "7px 0",
-                        borderBottom: `1px solid ${T.border}`,
-                      }}>
+                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                         <span style={{ fontFamily: T.mono, fontSize: 10, letterSpacing: "0.1em", color: T.label, textTransform: "uppercase" }}>{r.label}</span>
                         <span style={{ fontFamily: T.mono, fontSize: 14, color: T.body }}>{r.val}</span>
                       </div>
@@ -626,8 +768,7 @@ export default function QuantivaDashboard() {
                   )}
                 </Card>
 
-                {/* Anomalies */}
-                <Card label="Anomaly Alerts" right={
+                <Card label="Anomaly Alerts" T={T} right={
                   <span style={{
                     fontFamily: T.mono, fontSize: 9, letterSpacing: "0.1em",
                     padding: "2px 8px",
@@ -649,23 +790,17 @@ export default function QuantivaDashboard() {
                         borderLeft: `2px solid ${T.down}`, background: T.downBg,
                         padding: "10px 12px", marginBottom: 8,
                       }}>
-                        <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, marginBottom: 4, letterSpacing: "0.06em" }}>
-                          {fmtDate(a.date)}
-                        </div>
-                        <div style={{ fontFamily: T.sans, fontSize: 12, color: T.body, lineHeight: 1.5 }}>
-                          {msg}
-                        </div>
-                        <div style={{ fontFamily: T.mono, fontSize: 13, color: T.down, marginTop: 4 }}>
-                          ${fmt(a.price)}
-                        </div>
+                        <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, marginBottom: 4, letterSpacing: "0.06em" }}>{fmtDate(a.date)}</div>
+                        <div style={{ fontFamily: T.sans, fontSize: 12, color: T.body, lineHeight: 1.5 }}>{msg}</div>
+                        <div style={{ fontFamily: T.mono, fontSize: 13, color: T.down, marginTop: 4 }}>${fmt(a.price)}</div>
                       </div>
                     );
                   })}
                 </Card>
               </div>
 
-              {/* ── OHLCV table ── */}
-              <Card label="OHLCV Record" right={fmtDate(ohlcv.timestamp)}>
+              {/* OHLCV table */}
+              <Card label="OHLCV Record" right={fmtDate(ohlcv.timestamp)} T={T}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: T.mono }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${T.border}` }}>
@@ -674,27 +809,21 @@ export default function QuantivaDashboard() {
                           textAlign: i === 0 ? "left" : "right",
                           fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase",
                           color: T.muted, paddingBottom: 8, fontWeight: 500,
-                        }}>
-                          {h}
-                        </th>
+                        }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {[
-                      { label: "Open",   val: `$${fmt(openP)}`,        color: T.body },
-                      { label: "High",   val: `$${fmt(ohlcv.high)}`,   color: T.up   },
-                      { label: "Low",    val: `$${fmt(ohlcv.low)}`,    color: T.down },
-                      { label: "Close",  val: `$${fmt(ohlcv.close)}`,  color: T.accent },
-                      { label: "Volume", val: fmtVol(ohlcv.volume),    color: T.body },
+                      { label: "Open",   val: `$${fmt(openP)}`,       color: T.body   },
+                      { label: "High",   val: `$${fmt(ohlcv.high)}`,  color: T.up     },
+                      { label: "Low",    val: `$${fmt(ohlcv.low)}`,   color: T.down   },
+                      { label: "Close",  val: `$${fmt(ohlcv.close)}`, color: T.accent },
+                      { label: "Volume", val: fmtVol(ohlcv.volume),   color: T.body   },
                     ].map(row => (
                       <tr key={row.label} style={{ borderBottom: `1px solid ${T.border}` }}>
-                        <td style={{ padding: "9px 0", fontSize: 11, color: T.label, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                          {row.label}
-                        </td>
-                        <td style={{ padding: "9px 0", fontSize: 14, color: row.color, textAlign: "right" }}>
-                          {row.val}
-                        </td>
+                        <td style={{ padding: "9px 0", fontSize: 11, color: T.label, textTransform: "uppercase", letterSpacing: "0.08em" }}>{row.label}</td>
+                        <td style={{ padding: "9px 0", fontSize: 14, color: row.color, textAlign: "right" }}>{row.val}</td>
                       </tr>
                     ))}
                   </tbody>

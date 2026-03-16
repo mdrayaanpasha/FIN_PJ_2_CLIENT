@@ -324,7 +324,7 @@ export default function QuantivaHome() {
             <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill={C.accent} />
           </svg>
           <span style={{ fontFamily: C.syne, fontSize: 14, fontWeight: 800, letterSpacing: "0.12em", color: C.accent }}>
-            QUANTIVA
+            Arbit
           </span>
         </div>
         <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
@@ -373,7 +373,7 @@ export default function QuantivaHome() {
           maxWidth: 560, lineHeight: 1.75, marginBottom: 36,
           animation: "fadeUp .6s ease .16s both",
         }}>
-          Quantiva ingests live OHLCV data via Yahoo Finance, streams it through Apache Kafka, persists in Redis, and runs parallel consumers for technical indicators and anomaly detection — all in real time.
+          Arbit ingests live OHLCV data via Yahoo Finance, streams it through Apache Kafka, persists in Redis, and runs parallel consumers for technical indicators and anomaly detection — all in real time.
         </p>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", animation: "fadeUp .6s ease .24s both" }}>
@@ -465,7 +465,7 @@ export default function QuantivaHome() {
         <Reveal>
           <SectionEyebrow text="Capabilities" />
           <h2 style={{ fontFamily: C.syne, fontSize: "clamp(24px,3vw,36px)", fontWeight: 800, color: C.body, marginBottom: 36, letterSpacing: "-0.01em" }}>
-            What Quantiva does
+            What Arbit does
           </h2>
         </Reveal>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: C.border }}>
@@ -609,7 +609,7 @@ export default function QuantivaHome() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <svg width="14" height="14" viewBox="0 0 28 28"><polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill={C.accent} /></svg>
-          <span style={{ fontFamily: C.mono, fontSize: 10, letterSpacing: "0.12em", color: C.muted }}>QUANTIVA</span>
+          <span style={{ fontFamily: C.mono, fontSize: 10, letterSpacing: "0.12em", color: C.muted }}>Arbit</span>
         </div>
         <span style={{ fontFamily: C.mono, fontSize: 10, color: C.muted, letterSpacing: "0.06em" }}>
           Built by Rayaan Pasha · St. Joseph's University, Bengaluru
