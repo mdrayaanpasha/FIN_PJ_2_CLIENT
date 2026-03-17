@@ -1,17 +1,61 @@
-# React + Vite
+# Arbit — Client Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend for the Quantiva pipeline. Three-route SPA built with React + TailwindCSS, deployed on Vercel.
 
-Currently, two official plugins are available:
+**Live:** https://arbit-finance.vercel.app/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Routes
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Path         | Component            | Purpose                                      |
+|--------------|----------------------|----------------------------------------------|
+| `/`          | `QuantivaHome`       | Landing page — pipeline overview             |
+| `/dashboard` | `QuantivaDashboard`  | Live ticker analysis — OHLCV, SMA/EMA/RSI, anomalies |
+| `/links`     | `Links`              | Service endpoint references                  |
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# FIN_PJ_2_CLIENT
+## Stack
+
+| Layer    | Technology                  |
+|----------|-----------------------------|
+| Runtime  | React 18 (JSX)              |
+| Styling  | TailwindCSS                 |
+| Routing  | React Router v6             |
+| Deploy   | Vercel                      |
+
+---
+
+## Data Source
+
+All data fetched from `s_4` (persistence service) at port 3003. The dashboard consumes `/data/:ticker` which returns historical OHLCV, computed indicators, and live anomalies in one response.
+
+---
+
+## Running
+
+```bash
+npm install
+npm run dev
+```
+
+```bash
+# Production build
+npm run build
+```
+
+Vercel deploys automatically on push to `main`.
+
+---
+
+## Structure
+
+```
+src/
+├── App.jsx
+└── pages/
+    ├── home/main.jsx        # QuantivaHome
+    ├── analysis/main.jsx    # QuantivaDashboard
+    └── links/main.jsx       # Links
+```
